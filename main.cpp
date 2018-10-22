@@ -7,10 +7,10 @@ int main()
 	const size_t n_rands = 1e8;
 	const unsigned int n_threads = 8;
 
-	// Lets make some big-ish vectors	
-	std::vector<uint64_t> rand_vec(n_rands);	
+	// A big vector of vectors
 	std::vector<std::vector<uint64_t>> vector_storage;
 
+	// Lets make some big-ish vectors	
 	for(int i = 0; i < n_threads; i++)
 		vector_storage.emplace_back(std::vector<uint64_t>(n_rands));
 

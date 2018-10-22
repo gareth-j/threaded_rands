@@ -40,6 +40,7 @@ public:
 		// Jump stream for statistically independent streams for each thread
 		if(jump_factor > 0)
 		{
+			std::cout << "Jumping stream for xoroshiro128+ generator on thread : " << thread_id << "\n";
 			for(int x = 0; x < jump_factor; x++)
 				jump_stream();
 		}
@@ -153,7 +154,10 @@ void xoroshiro128::jump_stream()
 class pcg64_wrap : public base_class
 {
 public:
-	pcg64_wrap() : pcg64_gen(seed_source) {}
+	pcg64_wrap(const unsigned int thread_id) : pcg64_gen(seed_source)
+	{
+		std::cout << "Creating pcg64_unique generator for thread : " << thread_id << "\n";
+	}
 
 	~pcg64_wrap() {}
 
@@ -180,6 +184,9 @@ private:
 // Parts of this were taken from Prof. Melissa E. O'Neill's C++ implementation
 // I've added seeding from a reasonable (hopefully) entropy source
 
+// As we can't jump streams here currently this may be unsuitable for 
+// highly parallel code, will try and write a jump function soon.
+
 // Her code is available here
 // https://gist.github.com/imneme/85cff47d4bad8de6bdeb671f9c76c814
 
@@ -191,6 +198,8 @@ class jsf64_wrap : public base_class
 public:
 	jsf64_wrap(const unsigned int thread_id) : thread_no(thread_id)
 	{
+		std::cout << "Creating JSF64 generator for thread id : \n";
+
 		std::vector<uint64_t> seed_vec(2);
 		randutils::auto_seed_256 seed_source;
 		seed_source.generate(seed_vec.begin(), seed_vec.end());

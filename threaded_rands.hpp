@@ -23,7 +23,7 @@ public:
 		n_threads = get_thread_info(_n_threads);
 
 		for(int thread_id = 0; thread_id < n_threads; thread_id++)
-        	gen_vec.push_back(std::make_unique<pcg64_wrap>());
+        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
 	}
 
 	Threaded_rands(const generator_type sel, const unsigned int _n_threads)
@@ -36,7 +36,7 @@ public:
 		for(int thread_id = 0; thread_id < n_threads; thread_id++)
         {
 	        if(sel == generator_type::pcg64)
-	        	gen_vec.push_back(std::make_unique<pcg64_wrap>());
+	        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
 			if(sel == generator_type::xoro128)
 	        	gen_vec.push_back(std::make_unique<xoroshiro128>(thread_id));
 	        if(sel == generator_type::jsf64)

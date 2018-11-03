@@ -2,12 +2,10 @@
 #define	THREADEDRANDS_HPP
 
 #include <iostream>
-#include <cmath>
 #include <vector>
 #include <random>
-#include <string>
 #include <memory>
-#include <thread>
+#include <type_traits>
 #include <cstdlib>
 #include <omp.h>
 
@@ -15,66 +13,125 @@
 
 enum class generator_type{xoro128, pcg64, jsf64};
 
+template<typename result_type, typename state_type>
 class Threaded_rands
-{	
-public:
-	Threaded_rands(const unsigned int _n_threads = 1)
-	{
-		n_threads = get_thread_info(_n_threads);
+{
+protected:
+	// Gets hardware thread information - can be used to limit
+	// the number of threads requested to the number available in hardware
+	unsigned int get_thread_info(const int nt);
+	// In case C++11 hardware detection methods fail
+	unsigned int backup_thread_count();
+	// Number of threads to be used
+	unsigned int n_threads = 1;	
 
-		for(int thread_id = 0; thread_id < n_threads; thread_id++)
-        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
+	// Store the PRNG object created for each thread
+	std::vector<std::unique_ptr<base_class>> gen_vec;
+
+	// Number of bits in each type
+    const unsigned int RTYPE_BITS = 8*sizeof(result_type);
+    const unsigned int STYPE_BITS = 8*sizeof(state_type);
+
+	// This is used in the conversion of int types
+	const unsigned int bit_shift = STYPE_BITS - RTYPE_BITS;
+
+	// For int to double conversion using the quick method
+	const unsigned int right_shift = ((RTYPE_BITS == 64) ? 11 : 9);
+	const unsigned int left_shift = ((RTYPE_BITS == 64) ? 53 : 23);
+
+	// Check to see if 16-bit types are requested
+	static_assert(sizeof(result_type) < 32, "16-bit types not currently supported.");
+
+	// Pick the type of int we want to use for getting bounded rands
+	// This needs a better name
+	using int_type = typename std::conditional<sizeof(state_type) == 64, __uint128_t, uint64_t>::type;
+
+
+public:
+	// Min max values that can be output by the object	
+    static constexpr result_type min() { return 0; }
+    // Where ~ performs a bitwise NOT on zero to get the max of that type
+    static constexpr result_type max() { return ~ result_type(0); }
+
+    // Default ctor, using the PCG64 PRNG and a single thread
+    Threaded_rands(const int n = 1)
+    {  	// n_threads = get_thread_info(n);
+		// set_bit_shifts();
+		// if(RTYPE_BITS == 64)
+		// {
+			for(int thread_id = 0; thread_id < n; thread_id++)
+	        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));     		
+		// }
+		// else if(RTYPE_BITS == 32)
+		// 	for(int thread_id = 0; thread_id < n; thread_id++)
+	 //        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
 	}
 
-	Threaded_rands(const generator_type sel, const unsigned int _n_threads)
-	{			
-		// Check the number of threads passed isn't greater than the number available in hardware
-		// If passed is > hardware threads, uses max available in hardware
-		// TODO - Implement override for this
-		n_threads = get_thread_info(_n_threads);
+	// Threaded_rands(const generator_type sel, const unsigned int _n_threads)
+	// {			
+	// 	// Check the number of threads passed isn't greater than the number available in hardware
+	// 	// If passed is > hardware threads, uses max available in hardware
+	// 	// TODO - Implement override for this
+	// 	// n_threads = get_thread_info(_n_threads);
+	    
+	//  //    set_bit_shifts();
 
-		for(int thread_id = 0; thread_id < n_threads; thread_id++)
-        {
-	        if(sel == generator_type::pcg64)
-	        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
-			if(sel == generator_type::xoro128)
-	        	gen_vec.push_back(std::make_unique<xoroshiro128>(thread_id));
-	        if(sel == generator_type::jsf64)
-	        	gen_vec.push_back(std::make_unique<jsf64_wrap>(thread_id));
-	    }
+	// 	// Get working with pcg32 and pcg64 initially
+
+	// 	for(int thread_id = 0; thread_id < n_threads; thread_id++)
+ //        {
+	//         if(sel == generator_type::pcg64)
+	//         	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
+	// 		if(sel == generator_type::xoro128)
+	//         	gen_vec.push_back(std::make_unique<xoroshiro128>(thread_id));
+	//         if(sel == generator_type::jsf64)
+	//         	gen_vec.push_back(std::make_unique<jsf64_wrap>(thread_id));
+	//     }
+
+ //    }
+
+
+    result_type get_rand(const unsigned int thread_id)
+    {    	
+    	state_type rand = gen_vec[thread_id]->get_rand();
+   		
+   		// If we're using a 64-bit generator for 32-bit ints
+    	return rand >> bit_shift;
     }
-
-    // Get 64-bit rand from generator
-    uint64_t get_rand(const unsigned int thread_id);
-
-    uint64_t operator()() { return get_rand(0); }
-
-	// Uses Lemire's method to quickly get a rand within a range
-	uint64_t get_bounded_rand(const uint64_t upper, const unsigned int thread_id);
+    // Just use the first thread if operator() is called
+    result_type operator()(){return get_rand(0);}
 	
-
-	// TODO - 32-bit generation of ranged values
-	// 64-bit numbers for small ranges is overkill
+    // Uses Lemire's method to quickly get a rand within a range
+    // For [0:upper)
+	result_type get_bounded_rand(const result_type upper, const unsigned int thread_id);	
+	// For [lower:upper)
+	result_type get_bounded_rand(const result_type lower, const result_type upper, const unsigned int thread_id);
 
 	// Fills a vector with 64-bit ints [lower:upper)
-	void generate_range(std::vector<uint64_t>& vec, const unsigned int lower, const unsigned int upper, const unsigned int thread_id = 0);
+	void generate_range(std::vector<result_type>& vec, const unsigned int upper, const unsigned int thread_id);
+	void generate_range(std::vector<result_type>& vec, const unsigned int lower, const unsigned int upper, const unsigned int thread_id = 0);
+	
 	// Fills a 2D vector with 64-bit ints [lower:upper)
-	void generate_range(std::vector<std::vector<uint64_t>>& vec, const unsigned int lower, const unsigned int upper);
+	void generate_range(std::vector<std::vector<result_type>>& vec, const unsigned int upper);
+	void generate_range(std::vector<std::vector<result_type>>& vec, const unsigned int lower, const unsigned int upper);
 
-	// Note - the method below result in a difference of ~ 1e-8 from dividing by UINT64_MAX	
-	// Check if this introduces a bias of some kind in the generated numbers.
-
-	// Creates a double in the range [0:1) from a 64-bit unsigned int
-	inline double get_double(const uint64_t v) {return ((uint64_t)(v >> 11)) / (double)(1L << 53);}
-
+	// This function currently just returns a double in the range [0:1)
+	// This method below result in a difference of ~ 1e-8 from dividing by UINT64_MAX	
+	// TODO - Check if this introduces a bias in the generated numbers.
+	inline double get_double(const result_type v) {return ((uint64_t)(v >> right_shift)) / (double)(1L << left_shift);}
+	
 	// Alternative - but slower in my measurements - versions that may be more precise / not have rounding errors ?
-	// inline double get_double64(const uint64_t v) {return v/double(UINT64_MAX);}
+	// inline double get_double(const result_type v) { return v/double(max());}
 
-	// TODO - implement templated functions for generation of both 64-bit and 32-bit PRNGs
+	// TODO - add in functions for a better range of doubles  
 
 	// Take an array or vector and fill with 64-bit rands
 	// Generate 64-bit
-	void generate(std::vector<uint64_t>& vec, const unsigned int thread_id = 0)
+
+	// PROBLEMO
+	// What if the state type and result type are different, then this doesn't work. 
+	
+	void generate(std::vector<result_type>& vec, const unsigned int thread_id = 0)
 	{
 		for(auto& rand : vec)
 			rand = get_rand(thread_id);
@@ -85,8 +142,6 @@ public:
 	template<typename T>
 	void generate_2D(std::vector<T>& vec)
 	{
-		// Disable dynamic teams
-		omp_set_dynamic(0);
 		#pragma omp parallel for num_threads(n_threads)
 		for(unsigned int i = 0; i < vec.size(); i++)
 		{
@@ -98,9 +153,6 @@ public:
 	template<typename T, const std::size_t N>
 	void generate_2D(std::array<T, N>& arr)
 	{
-		// Disable dynamic teams
-		omp_set_dynamic(0);
-
 		#pragma omp parallel for num_threads(n_threads)
 		for(unsigned int i = 0; i < arr.size(); i++)
 		{
@@ -119,9 +171,6 @@ public:
 	template <typename T>
 	void generate_doubles_2D(std::vector<T>& vec)
 	{
-		// Disable dynamic teams
-		omp_set_dynamic(0);
-
 		#pragma omp parallel for num_threads(n_threads)
 		for(unsigned int i = 0; i < vec.size(); i++)
 		{
@@ -133,9 +182,6 @@ public:
 	template <typename T, const std::size_t N>
 	void generate_doubles_2D(std::array<T, N>& vec)
 	{
-		// Disable dynamic teams
-		omp_set_dynamic(0);
-
 		#pragma omp parallel for num_threads(n_threads)
 		for(unsigned int i = 0; i < vec.size(); i++)
 		{
@@ -143,101 +189,127 @@ public:
 		}
 	}
 
-	~Threaded_rands() {}	
-
-private:
-	unsigned int get_thread_info(const int nt);
-	unsigned int backup_thread_count();
-
-	unsigned int n_threads = 1;		
-
-	std::vector<std::unique_ptr<base_class>> gen_vec;
-
 }; // End class
 
 // ======================================
 // Threaded_rands member functions
 // ======================================
 
-uint64_t Threaded_rands::get_rand(const unsigned int thread_id)
-{
-	return gen_vec[thread_id]->get_rand();
-}
-
 // Lemire's method with modification by Prof. M. O'Neil
 // http://www.pcg-random.org/posts/bounded-rands.html
 // Can use this for upper and lower bounds as in generate_range
-uint64_t Threaded_rands::get_bounded_rand(const uint64_t upper, const unsigned int thread_id)
+
+// For random numbers in a range [0:upper)
+template<typename result_type, typename state_type>
+result_type Threaded_rands<result_type, state_type>::get_bounded_rand(const result_type upper, const unsigned int thread_id)
 {
-	int range = upper;
-
-	uint64_t x = get_rand(thread_id);
+	// State type is the type returned from the generator
+	state_type x = get_rand(thread_id);
     
-    __uint128_t m = static_cast<__uint128_t>(x) * static_cast<__uint128_t>(range);
+    int_type m = static_cast<int_type>(x) * static_cast<int_type>(upper);
     
-    uint64_t l = static_cast<uint64_t>(m);
+    state_type l = static_cast<state_type>(m);
 
-    if (l < range) 
+    if (l < upper) 
     {
-        uint64_t t = -range;
-        if (t >= range) 
+        state_type t = -upper;
+        if (t >= upper) 
         {
-            t -= range;
-            if (t >= range) 
-                t %= range;
+            t -= upper;
+            if (t >= upper) 
+                t %= upper;
         }
         while (l < t) 
         {
             x = get_rand(thread_id);
-            m = __uint128_t(x) * __uint128_t(range);
-            l = static_cast<uint64_t>(m);
+            m = int_type(x) * int_type(upper);
+            l = static_cast<state_type>(m);
         }
     }
 
-    return m >> 64;
+    return m >> bit_shift;
+}
+
+// For random numbers in a range [lower:upper)
+template<typename result_type, typename state_type>
+result_type Threaded_rands<result_type, state_type>::get_bounded_rand(const result_type lower, const result_type upper, const unsigned int thread_id)
+{
+	// If we're not doing [0-n)
+	result_type our_upper = upper - lower;
+
+	// State type is the type returned from the generator
+	state_type x = get_rand(thread_id);
+    
+    int_type m = static_cast<int_type>(x) * static_cast<int_type>(our_upper);
+    
+    state_type l = static_cast<state_type>(m);
+
+    if (l < our_upper) 
+    {
+        state_type t = -our_upper;
+        if (t >= our_upper) 
+        {
+            t -= our_upper;
+            if (t >= our_upper) 
+                t %= our_upper;
+        }
+        while (l < t) 
+        {
+            x = get_rand(thread_id);
+            m = int_type(x) * int_type(our_upper);
+            l = static_cast<state_type>(m);
+        }
+    }
+
+    // Add lower to get within the correct range
+    m += lower;
+
+    // Shift to get the type requested
+    return m >> bit_shift;
 }
 
 // This is currently limited to positive 64-bit ints - should it be the full range of the generator and negatives?
-void Threaded_rands::generate_range(std::vector<uint64_t>& vec, 
-									const unsigned int lower, const unsigned int upper, const unsigned int thread_id)
+template<typename result_type, typename state_type>
+void Threaded_rands<result_type, state_type>::generate_range(std::vector<result_type>& vec, const unsigned int upper, const unsigned int thread_id)
 {
-	// Use this for the generator and then modify what we get to get the correct range	
-	int our_upper = upper - lower;
-	// Add this value to the values returned by the generator to scale the range
-	uint64_t scale_value = lower;
-
 	for(auto& i : vec)
+		i = get_bounded_rand(upper, thread_id);
+}
+
+template<typename result_type, typename state_type>
+void Threaded_rands<result_type, state_type>::generate_range(std::vector<result_type>& vec, const unsigned int lower, const unsigned int upper, const unsigned int thread_id)
+{
+	for(auto& i : vec)
+		i = get_bounded_rand(lower, upper, thread_id);
+}
+
+template<typename result_type, typename state_type>
+void Threaded_rands<result_type, state_type>::generate_range(std::vector<std::vector<result_type>>& vec, const unsigned int upper)
+{
+	#pragma omp parallel for num_threads(n_threads)
+	for(unsigned int i = 0; i < vec.size(); i++)
 	{
-		uint64_t a_rand = get_bounded_rand(our_upper, thread_id);
-		i = a_rand + scale_value;
+		generate_range(vec[i], upper, i);
 	}
 }
 
-// This is currently limited to positive 64-bit ints - should it be the full range of the generator and negatives?
-void Threaded_rands::generate_range(std::vector<std::vector<uint64_t>>& vec, 
+template<typename result_type, typename state_type>
+void Threaded_rands<result_type, state_type>::generate_range(std::vector<std::vector<result_type>>& vec, 
 									const unsigned int lower, const unsigned int upper)
 {
-	// Use this for the generator and then modify what we get to get the correct range	
-	int our_upper = upper - lower;
-	// Add this value to the values returned by the generator to scale the range
-	uint64_t scale_value = lower;
-
-	// Disable dynamic teams
-	omp_set_dynamic(0);
-
 	#pragma omp parallel for num_threads(n_threads)
 	for(unsigned int i = 0; i < vec.size(); i++)
 	{
 		generate_range(vec[i], lower, upper, i);
 	}
-
-
 }
 
-// Detect the number of threads available on the machine using (if needed) multiple methods 
-unsigned int Threaded_rands::get_thread_info(const int n_selected)
-{
+// These functions are available but currently unused
 
+// Detect the number of threads available on the machine using (if needed) multiple methods 
+template<typename result_type, typename state_type>
+unsigned int Threaded_rands<result_type, state_type>::get_thread_info(const int n_selected)
+{
 	// How many to use
 	unsigned int n_utilise = 1;
 	// How many we have available
@@ -265,7 +337,8 @@ unsigned int Threaded_rands::get_thread_info(const int n_selected)
 
 // // If hardware_concurrency method fails fall back to this and detect the type of OS
 // // being used for a more portable (?) solution
-unsigned int Threaded_rands::backup_thread_count()
+template<typename result_type, typename state_type>
+unsigned int Threaded_rands<result_type, state_type>::backup_thread_count()
 {
 	unsigned int n_threads = 1;
 

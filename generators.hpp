@@ -10,14 +10,15 @@
 #include "jsf_implementation.hpp"
 
 // Base class used for interfacing with any generator that has a get_rand() fn.
-class base_class
-{
-public:
-	virtual uint64_t get_rand() = 0;
-	virtual ~base_class(){}
-private:
+// template<typename state_type>
+// class base_class
+// {
+// public:
+// 	virtual state_type get_rand() = 0;
+// 	virtual ~base_class(){}
+// private:
 
-};
+// };
 
 // ======================================
 // 		 		xoroshiro128+
@@ -29,7 +30,7 @@ private:
 // Original code available from
 // http://xoshiro.di.unimi.it/
 
-class xoroshiro128 : public base_class
+class xoroshiro128 //: public base_class
 {
 public:
 	xoroshiro128(const int thread_id) : thread_no(thread_id)
@@ -50,7 +51,7 @@ public:
 	
 	uint64_t operator()() {return get_rand();}
 
-	uint64_t get_rand() override;
+	uint64_t get_rand();
 private:
 
 	// For multiple threads - same as calling get_xoroshiro128_rand 2^64 times
@@ -151,7 +152,7 @@ void xoroshiro128::jump_stream()
 // Here we're using pcg64_unique for (hopefully) statistically independent streams
 
 // TODO - slim down PCG headers to extract pcg64_unique and pcg32_unique
-class pcg64_wrap : public base_class
+class pcg64_wrap //: public base_class
 {
 public:
 	pcg64_wrap(const unsigned int thread_id) : pcg64_gen(seed_source)
@@ -163,15 +164,38 @@ public:
 
 	uint64_t operator()() {return pcg64_gen();}
 
-	uint64_t get_rand() override {return pcg64_gen();}
+	uint64_t get_rand() {return pcg64_gen();}
 
 private:
 
-	std::size_t n_rands = 1;
+	// std::size_t n_rands = 1;
 	
 	pcg_extras::seed_seq_from<std::random_device> seed_source;	
     // Use a pcg64_unique as then we have a unique stream for each instance
 	pcg64_unique pcg64_gen;
+	
+};
+
+class pcg32_wrap
+{
+public:
+	pcg32_wrap(const unsigned int thread_id) : pcg32_gen(seed_source)
+	{
+		std::cout << "Creating pcg64_unique generator for thread : " << thread_id << "\n";
+	}
+
+	~pcg32_wrap() {}
+
+	uint32_t operator()() {return pcg32_gen();}
+
+	uint32_t get_rand() {return pcg32_gen();}
+
+private:
+
+	// std::size_t n_rands = 1;	
+	pcg_extras::seed_seq_from<std::random_device> seed_source;	
+    // Use a pcg32_unique as then we have a unique stream for each instance
+	pcg32_unique pcg32_gen;
 	
 };
 
@@ -193,7 +217,7 @@ private:
 // TODO  - implement constant variations available in Prof O'Neil's code
 // in template instantiation.
 
-class jsf64_wrap : public base_class
+class jsf64_wrap //: public base_class
 {
 public:
 	jsf64_wrap(const unsigned int thread_id) : thread_no(thread_id)
@@ -218,7 +242,7 @@ public:
 
 	uint64_t operator()() {return jsf_gen();}
 
-	uint64_t get_rand() override { return jsf_gen(); }
+	uint64_t get_rand() { return jsf_gen(); }
 	
 private:
 	// JSF64 Generator object

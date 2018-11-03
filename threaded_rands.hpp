@@ -7,6 +7,7 @@
 #include <memory>
 #include <type_traits>
 #include <cstdlib>
+#include <variant>
 #include <omp.h>
 
 #include "generators.hpp"
@@ -25,8 +26,10 @@ protected:
 	// Number of threads to be used
 	unsigned int n_threads = 1;	
 
+	using gen_type = std::variant<pcg64_wrap, pcg32_wrap, xoroshiro128, jsf64_wrap>;
+
 	// Store the PRNG object created for each thread
-	std::vector<std::unique_ptr<base_class>> gen_vec;
+	std::vector<gen_type> gen_vec;
 
 	// Number of bits in each type
     const unsigned int RTYPE_BITS = 8*sizeof(result_type);
@@ -57,41 +60,50 @@ public:
     Threaded_rands(const unsigned int n) : n_threads{n}
     {  	// n_threads = get_thread_info(n);
 		// set_bit_shifts();
-		// if(RTYPE_BITS == 64)
-		// {
+		if(STYPE_BITS == 64)
+		{
 			for(unsigned int thread_id = 0; thread_id < n; ++thread_id)
-	        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));     		
-		// }
-		// else if(RTYPE_BITS == 32)
+	        	gen_vec.emplace_back(pcg64_wrap(thread_id));
+	        	// gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));     		
+		}
+		else
+		{
+			for(unsigned int thread_id = 0; thread_id < n; ++thread_id)
+				gen_vec.emplace_back(pcg32_wrap(thread_id));
+	        	// gen_vec.push_back(std::make_unique<pcg32_wrap>(thread_id));     		
+		}
+
+		std::cout << "bit_shift : " << bit_shift << "\n";
 		// 	for(int thread_id = 0; thread_id < n; thread_id++)
 	 //        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
 	}
 
-	Threaded_rands(const generator_type sel, const unsigned int n) : n_threads{n}
-	{			
-		// Check the number of threads passed isn't greater than the number available in hardware
-		// If passed is > hardware threads, uses max available in hardware
-		// TODO - Implement override for this
-		// n_threads = get_thread_info(_n_threads);
+	// Threaded_rands(const generator_type sel, const unsigned int n) : n_threads{n}
+	// {			
+	// 	// Check the number of threads passed isn't greater than the number available in hardware
+	// 	// If passed is > hardware threads, uses max available in hardware
+	// 	// TODO - Implement override for this
+	// 	// n_threads = get_thread_info(_n_threads);
 	    
-		for(unsigned int thread_id = 0; thread_id < n; thread_id++)
-        {
-	        if(sel == generator_type::pcg64)
-	        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
-			if(sel == generator_type::xoro128)
-	        	gen_vec.push_back(std::make_unique<xoroshiro128>(thread_id));
-	        if(sel == generator_type::jsf64)
-	        	gen_vec.push_back(std::make_unique<jsf64_wrap>(thread_id));
-	    }
+	// 	for(unsigned int thread_id = 0; thread_id < n; thread_id++)
+ //        {
+	//         if(sel == generator_type::pcg64)
+	//         	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
+	// 		if(sel == generator_type::xoro128)
+	//         	gen_vec.push_back(std::make_unique<xoroshiro128>(thread_id));
+	//         if(sel == generator_type::jsf64)
+	//         	gen_vec.push_back(std::make_unique<jsf64_wrap>(thread_id));
+	//     }
 
-    }
+ //    }
 
-
+	// Get a visitor to access the generator to get the required rand
     result_type get_rand(const unsigned int thread_id)
     {    	
-    	state_type rand = gen_vec[thread_id]->get_rand();
+    	// state_type rand = std::get<result_type, gen_vec.get_rand();
    		
    		// If we're using a 64-bit generator for 32-bit ints
+   		// If just int types are passed this might push the number round to be negative
     	return rand >> bit_shift;
     }
     // Just use the first thread if operator() is called

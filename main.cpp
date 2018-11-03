@@ -2,7 +2,7 @@
 
 int main()
 {
-	const generator_type selection = generator_type::xoro128;
+	const generator_type selection = generator_type::pcg64;
 
 	const size_t n_rands = 1e8;
 	const unsigned int n_threads = 8;
@@ -16,19 +16,16 @@ int main()
 		vector_storage.emplace_back(std::vector<uint64_t>(n_rands));
 
 	// Threaded_rands<result_type, state_type>
-	Threaded_rands<uint64_t, uint64_t> my_generator;
+	Threaded_rands<uint64_t, uint64_t> my_generator(selection, n_threads);
 
 	// How long does it take
 	using hr_clock = std::chrono::high_resolution_clock;
 	
 	auto t_start  = hr_clock::now();
 
-	// my_generator.generate_2D(vector_storage);
-	for(int i = 0; i < 10; ++i)
-		std::cout << my_generator() << " ";
-	std::cout << "\n";
-
-	my_generator.generate(rand_vec);
+	my_generator.generate_2D(vector_storage);
+	
+	// my_generator.generate(rand_vec);
 
 	auto t_end = hr_clock::now();
 

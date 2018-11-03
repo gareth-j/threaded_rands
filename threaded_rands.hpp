@@ -54,12 +54,12 @@ public:
     static constexpr result_type max() { return ~ result_type(0); }
 
     // Default ctor, using the PCG64 PRNG and a single thread
-    Threaded_rands(const int n = 1)
+    Threaded_rands(const unsigned int n) : n_threads{n}
     {  	// n_threads = get_thread_info(n);
 		// set_bit_shifts();
 		// if(RTYPE_BITS == 64)
 		// {
-			for(int thread_id = 0; thread_id < n; thread_id++)
+			for(unsigned int thread_id = 0; thread_id < n; ++thread_id)
 	        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));     		
 		// }
 		// else if(RTYPE_BITS == 32)
@@ -67,28 +67,24 @@ public:
 	 //        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
 	}
 
-	// Threaded_rands(const generator_type sel, const unsigned int _n_threads)
-	// {			
-	// 	// Check the number of threads passed isn't greater than the number available in hardware
-	// 	// If passed is > hardware threads, uses max available in hardware
-	// 	// TODO - Implement override for this
-	// 	// n_threads = get_thread_info(_n_threads);
+	Threaded_rands(const generator_type sel, const unsigned int n) : n_threads{n}
+	{			
+		// Check the number of threads passed isn't greater than the number available in hardware
+		// If passed is > hardware threads, uses max available in hardware
+		// TODO - Implement override for this
+		// n_threads = get_thread_info(_n_threads);
 	    
-	//  //    set_bit_shifts();
+		for(unsigned int thread_id = 0; thread_id < n; thread_id++)
+        {
+	        if(sel == generator_type::pcg64)
+	        	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
+			if(sel == generator_type::xoro128)
+	        	gen_vec.push_back(std::make_unique<xoroshiro128>(thread_id));
+	        if(sel == generator_type::jsf64)
+	        	gen_vec.push_back(std::make_unique<jsf64_wrap>(thread_id));
+	    }
 
-	// 	// Get working with pcg32 and pcg64 initially
-
-	// 	for(int thread_id = 0; thread_id < n_threads; thread_id++)
- //        {
-	//         if(sel == generator_type::pcg64)
-	//         	gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));
-	// 		if(sel == generator_type::xoro128)
-	//         	gen_vec.push_back(std::make_unique<xoroshiro128>(thread_id));
-	//         if(sel == generator_type::jsf64)
-	//         	gen_vec.push_back(std::make_unique<jsf64_wrap>(thread_id));
-	//     }
-
- //    }
+    }
 
 
     result_type get_rand(const unsigned int thread_id)
@@ -127,11 +123,8 @@ public:
 
 	// Take an array or vector and fill with 64-bit rands
 	// Generate 64-bit
-
-	// PROBLEMO
-	// What if the state type and result type are different, then this doesn't work. 
-	
-	void generate(std::vector<result_type>& vec, const unsigned int thread_id = 0)
+	template<typename T>
+	void generate(std::vector<T>& vec, const unsigned int thread_id = 0)
 	{
 		for(auto& rand : vec)
 			rand = get_rand(thread_id);
@@ -140,9 +133,10 @@ public:
 	// For 2D vectors
 	// Although any type can be passed here there will be an implicit conversion from uint64_t to T
 	template<typename T>
-	void generate_2D(std::vector<T>& vec)
+	void generate_2D(std::vector<std::vector<T>>& vec)
 	{
-		#pragma omp parallel for num_threads(n_threads)
+		// omp_set_dynamic(0);
+		#pragma omp parallel for
 		for(unsigned int i = 0; i < vec.size(); i++)
 		{
 			generate(vec[i], i);
@@ -153,7 +147,8 @@ public:
 	template<typename T, const std::size_t N>
 	void generate_2D(std::array<T, N>& arr)
 	{
-		#pragma omp parallel for num_threads(n_threads)
+		// omp_set_dynamic(0);
+		#pragma omp parallel for
 		for(unsigned int i = 0; i < arr.size(); i++)
 		{
 			generate(arr[i], i);
@@ -171,7 +166,7 @@ public:
 	template <typename T>
 	void generate_doubles_2D(std::vector<T>& vec)
 	{
-		#pragma omp parallel for num_threads(n_threads)
+		#pragma omp parallel for
 		for(unsigned int i = 0; i < vec.size(); i++)
 		{
 			generate_doubles(vec[i], i);
@@ -182,7 +177,7 @@ public:
 	template <typename T, const std::size_t N>
 	void generate_doubles_2D(std::array<T, N>& vec)
 	{
-		#pragma omp parallel for num_threads(n_threads)
+		#pragma omp parallel for
 		for(unsigned int i = 0; i < vec.size(); i++)
 		{
 			generate_doubles(vec[i], i);

@@ -120,3 +120,11 @@ numbers. Due to this limitation that generator should not currently be used for 
 threads.
 
 
+### Acknowledgements
+
+Prof. M. O'Neil providing the PCG PRNG and C++ implementation
+of the JSF PRNG, both available from http://www.pcg-random.org/
+
+David Blackman and Sebastiano Vigna for their xo* family of PRNGs
+available at http://xoshiro.di.unimi.it/
+

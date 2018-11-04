@@ -14,6 +14,21 @@
 
 enum class generator_type{xoro128, pcg64, jsf64};
 
+// Overload for accessing different generator types in the gen vector
+template<class... Ts> struct overload : Ts... { using Ts::operator()...; };
+template<class... Ts> overload(Ts...) -> overload<Ts...>;
+
+// template<typename state_type>
+struct rand_getter
+{
+	std::uint64_t operator()(pcg64_wrap& gen){return 1; }//gen();}
+
+};
+
+
+
+
+
 template<typename result_type, typename state_type>
 class Threaded_rands
 {
@@ -25,7 +40,7 @@ protected:
 	unsigned int backup_thread_count();
 	// Number of threads to be used
 	unsigned int n_threads = 1;	
-
+	
 	using gen_type = std::variant<pcg64_wrap, pcg32_wrap, xoroshiro128, jsf64_wrap>;
 
 	// Store the PRNG object created for each thread
@@ -49,7 +64,6 @@ protected:
 	// This needs a better name
 	using int_type = typename std::conditional<sizeof(state_type) == 64, __uint128_t, uint64_t>::type;
 
-
 public:
 	// Min max values that can be output by the object	
     static constexpr result_type min() { return 0; }
@@ -63,7 +77,7 @@ public:
 		if(STYPE_BITS == 64)
 		{
 			for(unsigned int thread_id = 0; thread_id < n; ++thread_id)
-	        	gen_vec.emplace_back(pcg64_wrap(thread_id));
+	        	gen_vec.push_back(pcg64_wrap());
 	        	// gen_vec.push_back(std::make_unique<pcg64_wrap>(thread_id));     		
 		}
 		else
@@ -97,15 +111,38 @@ public:
 
  //    }
 
+  	// static constexpr auto gen_visit = [](auto& g){return g.get_rand();};
+
+	// Lambda utilising the overload for access to any of the available generator types get_rand function
+	// static constexpr auto gen_visit = overload{[](pcg64_wrap& g){return g.get_rand();}};
+	static constexpr auto gen_visit = [](pcg64_wrap& g) -> std::uint64_t {return g.get_rand();};
+							  // [](pcg32_wrap& g){return g.get_rand();},
+							  // [](xoroshiro128& g){return g.get_rand();},
+							  // [](jsf64_wrap& g){return g.get_rand();}};
+
+	result_type get_rand(const unsigned int thread_id)
+	{
+		// state_type rand = std::visit(gen_visit, gen_vec[thread_id]);
+		state_type rand = std::visit(rand_getter{}, gen_vec[thread_id]);
+
+		// std::cout << rand << "\t";
+
+		return rand >> bit_shift;
+	}
+
+
+
 	// Get a visitor to access the generator to get the required rand
-    result_type get_rand(const unsigned int thread_id)
-    {    	
-    	// state_type rand = std::get<result_type, gen_vec.get_rand();
+
+
+    // result_type get_rand(const unsigned int thread_id)
+    // {    	
+    // 	// state_type rand = std::get<result_type, gen_vec.get_rand();
    		
-   		// If we're using a 64-bit generator for 32-bit ints
-   		// If just int types are passed this might push the number round to be negative
-    	return rand >> bit_shift;
-    }
+   	// 	// If we're using a 64-bit generator for 32-bit ints
+   	// 	// If just int types are passed this might push the number round to be negative
+    // 	return rand >> bit_shift;
+    // }
     // Just use the first thread if operator() is called
     result_type operator()(){return get_rand(0);}
 	

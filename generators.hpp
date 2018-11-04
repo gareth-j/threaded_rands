@@ -151,52 +151,79 @@ void xoroshiro128::jump_stream()
 
 // Here we're using pcg64_unique for (hopefully) statistically independent streams
 
+class simple_class
+{
+public:
+	simple_class() {n_t = 1;}
+
+	int n_t = 0;
+};
+
+
 // TODO - slim down PCG headers to extract pcg64_unique and pcg32_unique
 class pcg64_wrap //: public base_class
 {
 public:
-	pcg64_wrap(const unsigned int thread_id) : pcg64_gen(seed_source)
+	// pcg64_wrap(const unsigned int thread_id) : pcg64_gen(seed_source)
+	pcg64_wrap()
 	{
+		int thread_id = 1;
 		std::cout << "Creating pcg64_unique generator for thread : " << thread_id << "\n";
+
+		pcg_extras::seed_seq_from<std::random_device> seed_source;		
+
+		pcg64_gen = std::make_unique<pcg64_unique>(seed_source);
 	}
 
 	~pcg64_wrap() {}
 
-	uint64_t operator()() {return pcg64_gen();}
+	uint64_t operator()() {return pcg64_gen->operator()();}
 
-	uint64_t get_rand() {return pcg64_gen();}
+	uint64_t get_rand() {return pcg64_gen->operator()();}
+
+	// Make the class non-copyable
+    pcg64_wrap(pcg64_wrap const&) = delete;
+    pcg64_wrap& operator=(pcg64_wrap const&) = delete;
+
+    // Make the class moveable (for placing inside the generator storage vector)
+    pcg64_wrap(pcg64_wrap&&) = default;
+    pcg64_wrap& operator=(pcg64_wrap&&) = default;
 
 private:
 
-	// std::size_t n_rands = 1;
-	
-	pcg_extras::seed_seq_from<std::random_device> seed_source;	
-    // Use a pcg64_unique as then we have a unique stream for each instance
-	pcg64_unique pcg64_gen;
+	std::unique_ptr<pcg64_unique> pcg64_gen;
 	
 };
 
 class pcg32_wrap
 {
 public:
-	pcg32_wrap(const unsigned int thread_id) : pcg32_gen(seed_source)
+	pcg32_wrap(const unsigned int thread_id)
 	{
-		std::cout << "Creating pcg64_unique generator for thread : " << thread_id << "\n";
+		std::cout << "Creating pcg32_unique generator for thread : " << thread_id << "\n";
+		pcg_extras::seed_seq_from<std::random_device> seed_source;	
+
+		pcg32_gen = std::make_unique<pcg32_unique>(seed_source);
 	}
 
 	~pcg32_wrap() {}
 
-	uint32_t operator()() {return pcg32_gen();}
+	uint32_t operator()() {return pcg32_gen->operator()();}
 
-	uint32_t get_rand() {return pcg32_gen();}
+	uint32_t get_rand() {return pcg32_gen->operator()();}
+
+		// Make the class non-copyable
+    pcg32_wrap(pcg32_wrap const&) = delete;
+    pcg32_wrap& operator=(pcg32_wrap const&) = delete;
+
+    // Make the class moveable (for placing inside the generator storage vector)
+    pcg32_wrap(pcg32_wrap&&) = default;
+    pcg32_wrap& operator=(pcg32_wrap&&) = default;
 
 private:
 
-	// std::size_t n_rands = 1;	
-	pcg_extras::seed_seq_from<std::random_device> seed_source;	
-    // Use a pcg32_unique as then we have a unique stream for each instance
-	pcg32_unique pcg32_gen;
-	
+	std::unique_ptr<pcg32_unique> pcg32_gen;
+
 };
 
 

@@ -85,4 +85,6 @@ Please see the devel branch for changes currently being made
 There are many limitations currently, including the use of only OpenMP for
 (very simple) multi-threading. In the next release threading will be properly implemented.
 
-Performance must still be optimised and a problem with the xoro128 generator needs to be fixed.
+The JSF generator implementation doesn't currently have a jump ahead function implemented 
+for non-overlapping streams of numbers. Because of this it shouldn't be used for parallel
+simulations.

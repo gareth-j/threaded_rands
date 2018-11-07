@@ -27,7 +27,7 @@ Create a threaded_rands object and (if you want) select the generator and number
 For a default generator using 1 thread and the pcg64_unique PRNG
 
 ```
-Threaded_rands my_generator();
+Threaded_rands<uint64_t, uint64_t> my_generator();
 ```
 
 If you just want random numbers that are from a statistically good algorithm and
@@ -44,7 +44,7 @@ Create a generator using 8 threads and the xoroshiro128+ PRNG
 ```
 generator_type my_selection = generator_type::xoro128;
 
-Threaded_rands my_generator(my_selection, 8);
+Threaded_rands<uint64_t, uint64_t> my_generator(my_selection, 8);
 ```
 
 Then you can pass an 1D or 2D array of a type you want

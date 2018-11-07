@@ -7,8 +7,8 @@ numbers (PRNs) in parallel
 
 There are three generator types to select from
 
-1. pcg64 - an implementation of the PCG64 generator by Prof. Melissa O'Neill
- 	 - a statistically good algorithm for creating pseudo-random numbers in parallel,
+1. pcg64 - an implementation of the PCG64 generator by Prof. Melissa O'Neill, 
+ 	   a statistically good algorithm for creating pseudo-random numbers in parallel,
 	   uses the pcg64_unique from her PCG library
 
 2. xoro128 - an implementation of the xoroshiro128+ PRNG from Sebastian Vigna, another statistically good

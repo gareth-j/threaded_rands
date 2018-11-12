@@ -7,3 +7,11 @@ Release 2018-10-18
 
 First release, lots of things to do and
 a lot of TODOs dotted around the code.
+
+
+Version 0.2
+Release 2018-11-12
+
+Added native 32-bit generator and template methods
+to allow for generation of most integer types.
+

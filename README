@@ -7,14 +7,14 @@ numbers (PRNs) in parallel
 
 There are three generator types to select from
 
-1. pcg64 - an implementation of the PCG64 generator by Prof. Melissa O'Neill
-		   - a statistically good algorithm for creating pseudo-random numbers in parallel,
-		     uses the pcg64_unique from her PCG library
+1. pcg - an implementation of the PCG generator by Prof. Melissa O'Neill
+	   - a statistically good algorithm for creating pseudo-random numbers in parallel,
+		 uses the pcg64_unique from her PCG library
 
 2. xoro128 - an implementation of the xoroshiro128+ PRNG from Sebastian Vigna, another statistically good
 		     generator that can be used with multiple threads
 
-3. jsf64   - an implementation of the JSF PRNG by Bob Jenkins with good statistical properties. 
+3. jsf   - an implementation of the JSF PRNG by Bob Jenkins with good statistical properties. 
              Still under testing for larger numbers of threads.
 
 
@@ -85,6 +85,8 @@ Please see the devel branch for changes currently being made
 There are many limitations currently, including the use of only OpenMP for
 (very simple) multi-threading. In the next release threading will be properly implemented.
 
-The JSF generator implementation doesn't currently have a jump ahead function implemented 
-for non-overlapping streams of numbers. Because of this it shouldn't be used for parallel
-simulations.
+The JSF generator implementation doesn't currently have a jump ahead function implemented.
+The 32-bit JSF generator can be used for up to 23 parallel streams of numbers due to
+different constants. The 64-bit version only has 1 set of constants so should not currently
+be used for multiple threads.
+

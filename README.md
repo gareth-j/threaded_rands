@@ -1,7 +1,7 @@
 # Threaded_rands
 
 A library to produce statistically unique streams of psuedo-random
-numbers (PRNs) in parallel
+numbers (PRNs) in parallel written in modern C++
 
 ## Getting Started
 

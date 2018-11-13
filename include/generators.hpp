@@ -278,6 +278,8 @@ protected:
 	std::array<unsigned int, 3> gen_64bit_constants = {7, 13, 37};
 	// These can be used to create statistically different streams for the 32-bit generator
 
+	// There's a vector of 23 3 element vectors here, for some reason it doesn't show up on GitHub
+	// and just displays a lot of white space. I promise it's there!
 	std::vector<std::vector<unsigned int>> gen_32bit_constants =  {{3, 14, 24},
 																   {3, 25, 15},
 																   {4, 15, 24},

@@ -17,6 +17,13 @@ There are three generator types to select from
 3. jsf64   - an implementation of the JSF PRNG by Bob Jenkins with good statistical properties. 
              Still under testing for larger numbers of threads.
 
+### Requirements
+
+As this is written with some C++17 features a compiler with support for C++17 is needed.
+I've compiled this with GCC 8.2.1 but most C++17 features should be available in GCC >= 7.
+For other compilers please see https://en.cppreference.com/w/cpp/compiler_support
+
+
 ### Usage
 ```
 #include "threaded_rands.hpp"

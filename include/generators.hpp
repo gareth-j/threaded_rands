@@ -2,7 +2,7 @@
 #define GENERATORS_HPP
 
 // Randutils by Prof. O'Neil for seeding from multiple entropy sources
-#include "randutils.hpp"
+#include "pcg/randutils.hpp"
 #include "pcg/pcg_random.hpp"
 
 

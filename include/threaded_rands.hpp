@@ -1,5 +1,5 @@
 #ifndef THREADEDRANDS_HPP
-#define	THREADEDRANDS_HPP
+#define THREADEDRANDS_HPP
 
 #include <iostream>
 #include <vector>
@@ -25,7 +25,7 @@ protected:
 	unsigned int backup_thread_count();
 	// Number of threads to be used
 	unsigned int n_threads = 1;	
-	
+
 	// using gen_type = std::variant<pcg64_wrap, pcg32_wrap, xoroshiro128, jsf64_wrap>;
 	using gen_type = std::variant<pcg_unique<state_type>, xoroshiro128<state_type>, jsf<state_type>>;
 
@@ -33,8 +33,8 @@ protected:
 	std::vector<gen_type> gen_vec;
 
 	// Number of bits in each type
-    const int RTYPE_BITS = 8*sizeof(result_type);
-    const int STYPE_BITS = 8*sizeof(state_type);
+	const int RTYPE_BITS = 8*sizeof(result_type);
+	const int STYPE_BITS = 8*sizeof(state_type);
 
 	// This is used in the conversion of int types, stop it being negative
 	const int bit_shift = std::max(0, STYPE_BITS - RTYPE_BITS);
@@ -51,24 +51,24 @@ protected:
 
 public:
 	// Min max values that can be output by the object	
-    static constexpr result_type min() { return 0; }
-    // Where ~ performs a bitwise NOT on zero to get the max of that type
-    static constexpr result_type max() { return ~result_type(0); }
+	static constexpr result_type min() { return 0; }
+	// Where ~ performs a bitwise NOT on zero to get the max of that type
+	static constexpr result_type max() { return ~result_type(0); }
 
-   // Default ctor, using the PCG64 PRNG and a single thread
-    Threaded_rands()
-    {  	   	
-   	 	gen_vec.push_back(pcg_unique<state_type>(0));	
-    }
+	// Default ctor, using the PCG64 PRNG and a single thread
+	Threaded_rands()
+	{  	   	
+		 	gen_vec.push_back(pcg_unique<state_type>(0));	
+	}
 
-    // Handle a number of threads and an optional generator selection argument
+	// Handle a number of threads and an optional generator selection argument
 	Threaded_rands(const unsigned int n, const generator_type sel = generator_type::pcg) : n_threads{n}
 	{					
 		// TODO - Implement thread number checking properly
 		// n_threads = get_thread_info(_n_threads);
 
 		for(unsigned int thread_id = 0; thread_id < n; ++thread_id)
-        {
+	    {
 	        if(sel == generator_type::pcg)
 	        	gen_vec.push_back(pcg_unique<state_type>(thread_id));
 			if(sel == generator_type::xoro128)
@@ -77,10 +77,10 @@ public:
 	        	gen_vec.push_back(jsf<state_type>(thread_id));
 	    }
 
-    }
+	}
 
-    // Visitor lambda for accessing the vector of variants
-  	static constexpr auto gen_visit = [](auto& g){return g.get_rand();};
+	// Visitor lambda for accessing the vector of variants
+		static constexpr auto gen_visit = [](auto& g){return g.get_rand();};
 
 	result_type get_rand(const unsigned int thread_id = 0)
 	{
@@ -94,11 +94,11 @@ public:
 		return double_conv(get_rand(thread_id));
 	}
 
-    // Just use the first thread if operator() is called
-    result_type operator()(){return get_rand(0);}
-	
-    // Uses Lemire's method to quickly get a rand within a range
-    // For [0:upper)
+	// Just use the first thread if operator() is called
+	result_type operator()(){return get_rand(0);}
+
+	// Uses Lemire's method to quickly get a rand within a range
+	// For [0:upper)
 	result_type get_bounded_rand(const result_type upper, const unsigned int thread_id);	
 	// For [lower:upper)
 	result_type get_bounded_rand(const result_type lower, const result_type upper, const unsigned int thread_id);
@@ -106,7 +106,7 @@ public:
 	// Fills a vector with 64-bit ints [lower:upper)
 	void generate_range(std::vector<result_type>& vec, const unsigned int upper, const unsigned int thread_id);
 	void generate_range(std::vector<result_type>& vec, const unsigned int lower, const unsigned int upper, const unsigned int thread_id = 0);
-	
+
 	// Fills a 2D vector with 64-bit ints [lower:upper)
 	void generate_range(std::vector<std::vector<result_type>>& vec, const unsigned int upper);
 	void generate_range(std::vector<std::vector<result_type>>& vec, const unsigned int lower, const unsigned int upper);
@@ -115,7 +115,7 @@ public:
 	// This method below result in a difference of ~ 1e-8 from dividing by UINT64_MAX	
 	// TODO - Check if this introduces a bias in the generated numbers.
 	inline double double_conv(const result_type v) {return ((state_type)(v >> right_shift)) / (double)(1L << left_shift);}
-	
+
 	// Alternative - but slower in my measurements - versions that may be more precise / not have rounding errors ?
 	// inline double double_conv(const result_type v) { return v/double(max());}
 
@@ -200,29 +200,29 @@ result_type Threaded_rands<result_type, state_type>::get_bounded_rand(const resu
 {
 	// State type is the type returned from the generator
 	state_type x = get_rand(thread_id);
-    
-    int_type m = static_cast<int_type>(x) * static_cast<int_type>(upper);
-    
-    state_type l = static_cast<state_type>(m);
 
-    if (l < upper) 
-    {
-        state_type t = -upper;
-        if (t >= upper) 
-        {
-            t -= upper;
-            if (t >= upper) 
-                t %= upper;
-        }
-        while (l < t) 
-        {
-            x = get_rand(thread_id);
-            m = int_type(x) * int_type(upper);
-            l = static_cast<state_type>(m);
-        }
-    }
+	int_type m = static_cast<int_type>(x) * static_cast<int_type>(upper);
 
-    return m >> bit_shift;
+	state_type l = static_cast<state_type>(m);
+
+	if (l < upper) 
+	{
+	    state_type t = -upper;
+	    if (t >= upper) 
+	    {
+	        t -= upper;
+	        if (t >= upper) 
+	            t %= upper;
+	    }
+	    while (l < t) 
+	    {
+	        x = get_rand(thread_id);
+	        m = int_type(x) * int_type(upper);
+	        l = static_cast<state_type>(m);
+	    }
+	}
+
+	return m >> bit_shift;
 }
 
 // For random numbers in a range [lower:upper)
@@ -234,33 +234,33 @@ result_type Threaded_rands<result_type, state_type>::get_bounded_rand(const resu
 
 	// State type is the type returned from the generator
 	state_type x = get_rand(thread_id);
-    
-    int_type m = static_cast<int_type>(x) * static_cast<int_type>(our_upper);
-    
-    state_type l = static_cast<state_type>(m);
 
-    if (l < our_upper) 
-    {
-        state_type t = -our_upper;
-        if (t >= our_upper) 
-        {
-            t -= our_upper;
-            if (t >= our_upper) 
-                t %= our_upper;
-        }
-        while (l < t) 
-        {
-            x = get_rand(thread_id);
-            m = int_type(x) * int_type(our_upper);
-            l = static_cast<state_type>(m);
-        }
-    }
+	int_type m = static_cast<int_type>(x) * static_cast<int_type>(our_upper);
 
-    // Add lower to get within the correct range
-    m += lower;
+	state_type l = static_cast<state_type>(m);
 
-    // Shift to get the type requested
-    return m >> bit_shift;
+	if (l < our_upper) 
+	{
+	    state_type t = -our_upper;
+	    if (t >= our_upper) 
+	    {
+	        t -= our_upper;
+	        if (t >= our_upper) 
+	            t %= our_upper;
+	    }
+	    while (l < t) 
+	    {
+	        x = get_rand(thread_id);
+	        m = int_type(x) * int_type(our_upper);
+	        l = static_cast<state_type>(m);
+	    }
+	}
+
+	// Add lower to get within the correct range
+	m += lower;
+
+	// Shift to get the type requested
+	return m >> bit_shift;
 }
 
 // This is currently limited to positive 64-bit ints - should it be the full range of the generator and negatives?
@@ -313,7 +313,7 @@ unsigned int Threaded_rands<result_type, state_type>::get_thread_info(const int 
 	// If the above doesn't work (it will return 0 on error) use a different method
 	if(n_hardware == 0)
 		n_hardware = backup_thread_count();
-	
+
 	if(n_selected <= 0)
 	{
 		std::cerr << "The number of selected threads is too low. The maximum available in hardware will be used.\n";

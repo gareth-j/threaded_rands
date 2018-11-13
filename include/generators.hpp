@@ -6,6 +6,8 @@
 #include "pcg/pcg_random.hpp"
 
 
+// TODO - Add support for older version of C++
+
 // Base class used for interfacing with any generator that has a get_rand() fn.
 // template<typename state_type>
 // class base_class
@@ -107,8 +109,6 @@ protected:
 
 	// For multiple threads - same as calling get_xoroshiro128_rand 2^64 times
 	void jump_stream();
-	// SplitMix64 PRNG used to seed
-	// state_type splitmix_seeder(const state_type x);
 
 public:
 	xoroshiro128(const unsigned int thread_id) : thread_no{thread_id}
@@ -255,11 +255,8 @@ public:
 // As we can't jump streams here currently this may be unsuitable for 
 // highly parallel code, will try and write a jump function soon.
 
-// Her code is available here
+// Code is available here
 // https://gist.github.com/imneme/85cff47d4bad8de6bdeb671f9c76c814
-
-// TODO  - implement constant variations available in Prof O'Neil's code
-// in template instantiation.
 
 template<typename state_type>
 class jsf : jsf_counter<state_type>

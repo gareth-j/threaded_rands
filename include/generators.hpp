@@ -82,33 +82,162 @@ public:
 // 		 		xoroshiro128+
 // ======================================
 
-// This is a C++ implementation of the xoroshiro128+ PRNG
+// This is a C++ implementation of the xoroshiro128+ 32-bit PRNG
 // by David Blackman and Sebastiano Vigna
 
 // Original code available from
 // http://xoshiro.di.unimi.it/
 
+
+// See this http://www.jonathanbeard.io/blog/2016/04/01/template-type-sizing.html
+
+template<typename state_type>
+class xoro128p_32
+{
+protected:	
+	unsigned int thread_no = 0;	
+	
+	static const std::size_t n_xoro32_seeds = 4;
+	
+	std::array<state_type, n_xoro32_seeds> seed_array;
+
+	static inline uint32_t rotl(const uint32_t x, int k) {return (x << k) | (x >> (32 - k));}
+
+	void auto_seed()
+	{
+		splitmix64<state_type> seed_gen;
+	
+		seed_array[0] = seed_gen();
+		seed_array[1] = seed_gen();
+		seed_array[2] = seed_gen();
+		seed_array[3] = seed_gen();
+	}
+
+	void jump_stream()
+	{
+		static const state_type JUMP[] = { 0x8764000b, 0xf542d2d3, 0x6fa035c3, 0x77f2db5b };
+
+		state_type s0 = 0;
+		state_type s1 = 0;
+		state_type s2 = 0;
+		state_type s3 = 0;
+
+		for(int i = 0; i < sizeof JUMP / sizeof *JUMP; i++)
+		{
+			for(int b = 0; b < 32; b++) 
+			{
+				if (JUMP[i] & UINT32_C(1) << b) {
+					s0 ^= seed_array[0];
+					s1 ^= seed_array[1];
+					s2 ^= seed_array[2];
+					s3 ^= seed_array[3];
+				}
+				get_rand();	
+			}
+		}
+			
+		seed_array[0] = s0;
+		seed_array[1] = s1;
+		seed_array[2] = s2;
+		seed_array[3] = s3;
+	}
+
+public:
+	xoro128p_32()
+	{
+		std::cout << "Creating a 32-bit xoroshiro128plus generator for thread : " << thread_id << "\n";
+		auto_seed();		
+
+		unsigned int jump_factor = 2*thread_id;
+		// Jump stream for statistically independent streams for each thread
+		if(jump_factor > 0)
+		{
+			for(int x = 0; x < jump_factor; x++)
+				jump_stream();
+		}
+	}
+
+	// These will be state type here and get shifted by the threaded_rands object
+	// if necessary
+	state_type get_rand()
+	{
+		const state_type result_plus = s[0] + s[3];
+
+		const state_type t = s[1] << 9;
+
+		seed_array[2] ^= seed_array[0];
+		seed_array[3] ^= seed_array[1];
+		seed_array[1] ^= seed_array[2];
+		seed_array[0] ^= seed_array[3];
+
+		s[2] ^= t;
+
+		s[3] = rotl(s[3], 11);
+
+		return result_plus;
+	}
+
+	state_type operator()() {return get_rand();}
+
+	
+};
+
+// This is a C++ implementation of the xoroshiro128+ 64-bit PRNG
+// by David Blackman and Sebastiano Vigna
+
 // Result type is not needed here as the shift will be made in threaded_rands
 template<typename state_type>
-class xoroshiro128 //: public base_class
+class xoro128p_64 //: public base_class
 {
 protected:
 	// This keeps track of the thread number, for each xoroshiro thread 
 	// jump * thread number is used to ensure individual threads
 	// Uses the auto_seed_256 function from rand_utils to seed SplitMix64 and fills the seed_array
-	void auto_seed();
-
 	unsigned int thread_no = 0;
 	
-	static const std::size_t n_xoro_seeds = 2;
+	static const std::size_t n_xoro64_seeds = 2;
 
-	std::array<state_type, n_xoro_seeds> seed_array;
+	std::array<state_type, n_xoro64_seeds> seed_array;
 
 	// Original xoroshiro code
-	static inline state_type rotl(const state_type x, int k) {return (x << k) | (x >> (64 - k));}
+	static inline state_type rotl(const uint64_t x, int k) {return (x << k) | (x >> (64 - k));}
+	void auto_seed()
+	{
+		// Create a seeded SplitMix64 instance to generate
+		// further seeds for this generator.
+		// This may be overkill but is only done at start
+		splitmix64<state_type> seed_gen;
+
+		seed_array[0] = seed_gen();
+		seed_array[1] = seed_gen();
+	}
 
 	// For multiple threads - same as calling get_xoroshiro128_rand 2^64 times
-	void jump_stream();
+	void jump_stream()
+	{
+		// static const uint64_t JUMP[] = { 0xbeac0467eba5facb, 0xd86b048b86aa9922 };
+		// Updated values - 2018-10-15
+		static const state_type JUMP[] = { 0xdf900294d8f554a5, 0x170865df4b3201fc };
+
+		state_type s0 = 0;
+		state_type s1 = 0;
+
+		for(int i = 0; i < sizeof JUMP / sizeof *JUMP; i++)
+		{
+		for(int b = 0; b < 64; b++) 
+			{
+				if (JUMP[i] & UINT64_C(1) << b) 
+				{
+					s0 ^= seed_array[0];
+					s1 ^= seed_array[1];
+				}
+				get_rand();
+			}
+		}
+
+		seed_array[0] = s0;
+		seed_array[1] = s1;
+	}
 
 public:
 	xoroshiro128(const unsigned int thread_id) : thread_no{thread_id}
@@ -126,70 +255,40 @@ public:
 		}
 	}
 
-	~xoroshiro128() {}	
-
 	// These will be state type here and get shifted by the threaded_rands object
 	// if necessary
+	state_type get_rand()
+	{
+		const state_type s0 = seed_array[0];
+		state_type s1 = seed_array[1];
+		const state_type result = s0 + s1;
+
+
+		// Updated the constants 24, 16, 37 here as Vigna's recommendation.
+		s1 ^= s0;
+		seed_array[0] = rotl(s0, 24) ^ s1 ^ (s1 << 16); // a, b
+		seed_array[1] = rotl(s1, 37); // c
+
+		return result;
+	}
+
 	state_type operator()() {return get_rand();}
-	state_type get_rand();
 
 };
 
-
-template<typename state_type>
-void xoroshiro128<state_type>::auto_seed()
-{
-	// Create a seeded SplitMix64 instance to generate
-	// further seeds for this generator.
-	// This may be overkill but is only done at start
-	splitmix64<state_type> seed_gen;
+// // This is the xoroshiro128+ PRNG
+// template<typename state_type>
+// state_type xoroshiro128<state_type>::get_rand()
+// {
 	
-	seed_array[0] = seed_gen();
-	seed_array[1] = seed_gen();
-}
+// }
 
-// This is the xoroshiro128+ PRNG
-template<typename state_type>
-state_type xoroshiro128<state_type>::get_rand()
-{
-	const state_type s0 = seed_array[0];
-	state_type s1 = seed_array[1];
-	const state_type result = s0 + s1;
+// // For multiple threads
+// template<typename state_type>
+// void xoroshiro128<state_type>::jump_stream()
+// {	
 
-
-	// Updated the constants 24, 16, 37 here as Vigna's recommendation.
-	s1 ^= s0;
-	seed_array[0] = rotl(s0, 24) ^ s1 ^ (s1 << 16); // a, b
-	seed_array[1] = rotl(s1, 37); // c
-
-	return result;
-}
-
-// For multiple threads
-template<typename state_type>
-void xoroshiro128<state_type>::jump_stream()
-{	
-	// static const uint64_t JUMP[] = { 0xbeac0467eba5facb, 0xd86b048b86aa9922 };
-	// Updated values - 2018-10-15
-	static const state_type JUMP[] = { 0xdf900294d8f554a5, 0x170865df4b3201fc };
-
-	state_type s0 = 0;
-	state_type s1 = 0;
-
-	for(int i = 0; i < sizeof JUMP / sizeof *JUMP; i++)
-		for(int b = 0; b < 64; b++) 
-		{
-			if (JUMP[i] & UINT64_C(1) << b) 
-			{
-				s0 ^= seed_array[0];
-				s1 ^= seed_array[1];
-			}
-			get_rand();
-		}
-
-	seed_array[0] = s0;
-	seed_array[1] = s1;
-}
+// }
 
 
 // ======================================

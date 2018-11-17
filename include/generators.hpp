@@ -82,38 +82,107 @@ public:
 // 		 		xoroshiro128+
 // ======================================
 
-// This is a C++ implementation of the xoroshiro128+ PRNG
+// This is a C++ implementation of the xoroshiro128+ 32-bit PRNG
 // by David Blackman and Sebastiano Vigna
 
 // Original code available from
 // http://xoshiro.di.unimi.it/
 
-// Result type is not needed here as the shift will be made in threaded_rands
-template<typename state_type>
-class xoroshiro128 //: public base_class
+// A more general xoroshiro 128 class for 32 and 64-bit generation
+template <typename state_type, std::size_t S_SIZE = 8*sizeof(state_type)>
+class xoroshiro128
 {
 protected:
-	// This keeps track of the thread number, for each xoroshiro thread 
-	// jump * thread number is used to ensure individual threads
-	// Uses the auto_seed_256 function from rand_utils to seed SplitMix64 and fills the seed_array
-	void auto_seed();
-
-	unsigned int thread_no = 0;
+	unsigned int thread_no = 0;	
 	
-	static const std::size_t n_xoro_seeds = 2;
+	const unsigned int STYPE_BITS = 8*sizeof(state_type);
+	
+	const std::size_t n_xoro_seeds = (STYPE_BITS == 64 ? 2 : 4);
+	
+	std::vector<state_type> seed_array;
 
-	std::array<state_type, n_xoro_seeds> seed_array;
+	// Circular rotation function
+	inline state_type rotl(const state_type x, int k) {return (x << k) | (x >> (STYPE_BITS - k));}
+	
+	// Create a seeded SplitMix64 instance to generate
+	// further seeds for this generator.
+	// This may be overkill but is only done at start
+	void auto_seed()
+	{
+		splitmix64<state_type> seed_gen;
 
-	// Original xoroshiro code
-	static inline state_type rotl(const state_type x, int k) {return (x << k) | (x >> (64 - k));}
+		for(auto &s : seed_array)
+			s = seed_gen();
+	}
+
+	template <std::size_t S = S_SIZE>
+	typename std::enable_if<S == 32, void>::type
+	jump_stream()
+	{
+		const uint32_t JUMP[] = { 0x8764000b, 0xf542d2d3, 0x6fa035c3, 0x77f2db5b };
+
+		uint32_t s0 = 0;
+		uint32_t s1 = 0;
+		uint32_t s2 = 0;
+		uint32_t s3 = 0;
+
+		for(int i = 0; i < sizeof JUMP / sizeof *JUMP; i++)
+		{
+			for(int b = 0; b < 32; b++) 
+			{
+				if (JUMP[i] & UINT32_C(1) << b) {
+					s0 ^= seed_array[0];
+					s1 ^= seed_array[1];
+					s2 ^= seed_array[2];
+					s3 ^= seed_array[3];
+				}
+				get_rand();	
+			}
+		}
+			
+		seed_array[0] = s0;
+		seed_array[1] = s1;
+		seed_array[2] = s2;
+		seed_array[3] = s3;
+	}
 
 	// For multiple threads - same as calling get_xoroshiro128_rand 2^64 times
-	void jump_stream();
+	// For a 64-bit generator
+	template <std::size_t S = S_SIZE>
+	typename std::enable_if<S == 64, void>::type 
+	jump_stream()
+	{
+		// static const uint64_t JUMP[] = { 0xbeac0467eba5facb, 0xd86b048b86aa9922 };
+		// Updated values - 2018-10-15
+		std::cout << "64-bit version\n";
+		const state_type JUMP[] = { 0xdf900294d8f554a5, 0x170865df4b3201fc };
 
+		uint64_t s0 = 0;
+		uint64_t s1 = 0;
+
+		for(int i = 0; i < sizeof JUMP / sizeof *JUMP; i++)
+		{
+		for(int b = 0; b < 64; b++) 
+			{
+				if (JUMP[i] & UINT64_C(1) << b) 
+				{
+					s0 ^= seed_array[0];
+					s1 ^= seed_array[1];
+				}
+				get_rand();
+			}
+		}
+
+		seed_array[0] = s0;
+		seed_array[1] = s1;
+	}
+
+	
 public:
 	xoroshiro128(const unsigned int thread_id) : thread_no{thread_id}
 	{
 		std::cout << "Creating xoroshiro128 generator for thread : " << thread_id << "\n";
+		seed_array.resize(n_xoro_seeds);
 		auto_seed();		
 		unsigned int jump_factor = 2*thread_id;
 
@@ -126,70 +195,47 @@ public:
 		}
 	}
 
-	~xoroshiro128() {}	
+	// 32-bit generator
+	template <std::size_t S = S_SIZE>
+	typename std::enable_if<S == 32, state_type>::type
+	get_rand()
+	{
+		const uint32_t result_plus = seed_array[0] + seed_array[3];
 
-	// These will be state type here and get shifted by the threaded_rands object
-	// if necessary
-	state_type operator()() {return get_rand();}
-	state_type get_rand();
+		const uint32_t x = seed_array[1] << 9;
+
+		seed_array[2] ^= seed_array[0];
+		seed_array[3] ^= seed_array[1];
+		seed_array[1] ^= seed_array[2];
+		seed_array[0] ^= seed_array[3];
+
+		seed_array[2] ^= x;
+
+		seed_array[3] = rotl(seed_array[3], 11);
+
+		return result_plus;
+	}
+	
+	// 64-bit generator
+	template <std::size_t S = S_SIZE>
+	typename std::enable_if<S == 64, state_type>::type
+	get_rand()
+	{
+		const uint64_t s0 = seed_array[0];
+		state_type s1 = seed_array[1];
+		const uint64_t result = s0 + s1;
+
+		// Updated the constants 24, 16, 37 here as Vigna's recommendation.
+		s1 ^= s0;
+		seed_array[0] = rotl(s0, 24) ^ s1 ^ (s1 << 16); // a, b
+		seed_array[1] = rotl(s1, 37); // c
+
+		return result;
+	}
+
+	state_type operator()() {return get_rand(0);}
 
 };
-
-
-template<typename state_type>
-void xoroshiro128<state_type>::auto_seed()
-{
-	// Create a seeded SplitMix64 instance to generate
-	// further seeds for this generator.
-	// This may be overkill but is only done at start
-	splitmix64<state_type> seed_gen;
-	
-	seed_array[0] = seed_gen();
-	seed_array[1] = seed_gen();
-}
-
-// This is the xoroshiro128+ PRNG
-template<typename state_type>
-state_type xoroshiro128<state_type>::get_rand()
-{
-	const state_type s0 = seed_array[0];
-	state_type s1 = seed_array[1];
-	const state_type result = s0 + s1;
-
-
-	// Updated the constants 24, 16, 37 here as Vigna's recommendation.
-	s1 ^= s0;
-	seed_array[0] = rotl(s0, 24) ^ s1 ^ (s1 << 16); // a, b
-	seed_array[1] = rotl(s1, 37); // c
-
-	return result;
-}
-
-// For multiple threads
-template<typename state_type>
-void xoroshiro128<state_type>::jump_stream()
-{	
-	// static const uint64_t JUMP[] = { 0xbeac0467eba5facb, 0xd86b048b86aa9922 };
-	// Updated values - 2018-10-15
-	static const state_type JUMP[] = { 0xdf900294d8f554a5, 0x170865df4b3201fc };
-
-	state_type s0 = 0;
-	state_type s1 = 0;
-
-	for(int i = 0; i < sizeof JUMP / sizeof *JUMP; i++)
-		for(int b = 0; b < 64; b++) 
-		{
-			if (JUMP[i] & UINT64_C(1) << b) 
-			{
-				s0 ^= seed_array[0];
-				s1 ^= seed_array[1];
-			}
-			get_rand();
-		}
-
-	seed_array[0] = s0;
-	seed_array[1] = s1;
-}
 
 
 // ======================================
@@ -217,7 +263,7 @@ protected:
 	// typedef typename std::conditional<sizeof(state_type) == 64, pcg64_unique, pcg32_unique>::type pcg_type;
 	using pcg_type = typename std::conditional<(8*sizeof(state_type) == 64), pcg64_unique, pcg32_unique>::type;
 
-	std::unique_ptr<pcg_type> pcg_gen;
+	pcg_type pcg_gen;
 
 	unsigned int thread_no = 0;
 
@@ -227,12 +273,14 @@ public:
 		std::cout << "Creating PCG generator for thread : " << thread_id << "\n";
 		// Get the seeding object
 		pcg_extras::seed_seq_from<std::random_device> seed_source;	
-		pcg_gen = std::make_unique<pcg_type>(seed_source);
+
+		pcg_gen = pcg_type(seed_source);
 	}
+
+	state_type get_rand() {	return pcg_gen(); }
 
 	state_type operator()() {return get_rand();}
 
-	state_type get_rand() {	return pcg_gen->operator()(); }
 
 // // Make the class non-copyable
  //    pcg_unique(pcg_unique const&) = delete;
@@ -270,9 +318,9 @@ protected:
 	state_type a_, b_, c_, d_;
 
 	// Number of bits in the state type
-	static constexpr unsigned int STYPE_BITS = 8*sizeof(state_type);
+	const unsigned int STYPE_BITS = 8*sizeof(state_type);
 
-	static state_type rotate(state_type x, unsigned int k) { return (x << k) | (x >> (STYPE_BITS - k)); }
+	state_type rotate(state_type x, unsigned int k) { return (x << k) | (x >> (STYPE_BITS - k)); }
 
 	// There are only 2 sets of constants for the 64-bit generator so we won't change those
 	std::array<unsigned int, 3> gen_64bit_constants = {7, 13, 37};
@@ -369,10 +417,6 @@ public:
 
     state_type operator()() { return get_rand(); }
 
-
 };
-
-
-
 
 #endif

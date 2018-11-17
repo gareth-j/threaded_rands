@@ -50,16 +50,15 @@ protected:
 	using int_type = typename std::conditional<8*sizeof(state_type) == 64, __uint128_t, uint64_t>::type;
 
 public:
-	// Min max values that can be output by the object	
-	static constexpr result_type min() { return 0; }
-	// Where ~ performs a bitwise NOT on zero to get the max of that type
-	static constexpr result_type max() { return ~result_type(0); }
+    constexpr result_type min() { return 0; }
+    // Where ~ performs a bitwise NOT on zero to get the max of that type
+    constexpr result_type max() { return ~result_type(0); }
 
-	// Default ctor, using the PCG64 PRNG and a single thread
-	Threaded_rands()
-	{  	   	
-		 	gen_vec.push_back(pcg_unique<state_type>(0));	
-	}
+   // Default ctor, using the PCG64 PRNG and a single thread
+    Threaded_rands()
+    {  	   	
+   	 	gen_vec.push_back(pcg_unique<state_type>(0));	
+    }
 
 	// Handle a number of threads and an optional generator selection argument
 	Threaded_rands(const unsigned int n, const generator_type sel = generator_type::pcg) : n_threads{n}

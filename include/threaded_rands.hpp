@@ -51,9 +51,9 @@ protected:
 
 public:
 	// Min max values that can be output by the object	
-    static constexpr result_type min() { return 0; }
+    constexpr result_type min() { return 0; }
     // Where ~ performs a bitwise NOT on zero to get the max of that type
-    static constexpr result_type max() { return ~result_type(0); }
+    constexpr result_type max() { return ~result_type(0); }
 
    // Default ctor, using the PCG64 PRNG and a single thread
     Threaded_rands()

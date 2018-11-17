@@ -95,7 +95,7 @@ class xoroshiro128
 protected:
 	unsigned int thread_no = 0;	
 	
-	const int STYPE_BITS = 8*sizeof(state_type);
+	const unsigned int STYPE_BITS = 8*sizeof(state_type);
 	
 	const std::size_t n_xoro_seeds = (STYPE_BITS == 64 ? 2 : 4);
 	
@@ -154,6 +154,7 @@ protected:
 	{
 		// static const uint64_t JUMP[] = { 0xbeac0467eba5facb, 0xd86b048b86aa9922 };
 		// Updated values - 2018-10-15
+		std::cout << "64-bit version\n";
 		const state_type JUMP[] = { 0xdf900294d8f554a5, 0x170865df4b3201fc };
 
 		uint64_t s0 = 0;
@@ -175,6 +176,7 @@ protected:
 		seed_array[0] = s0;
 		seed_array[1] = s1;
 	}
+
 	
 public:
 	xoroshiro128(const unsigned int thread_id) : thread_no{thread_id}
@@ -316,9 +318,9 @@ protected:
 	state_type a_, b_, c_, d_;
 
 	// Number of bits in the state type
-	static constexpr unsigned int STYPE_BITS = 8*sizeof(state_type);
+	const unsigned int STYPE_BITS = 8*sizeof(state_type);
 
-	static state_type rotate(state_type x, unsigned int k) { return (x << k) | (x >> (STYPE_BITS - k)); }
+	state_type rotate(state_type x, unsigned int k) { return (x << k) | (x >> (STYPE_BITS - k)); }
 
 	// There are only 2 sets of constants for the 64-bit generator so we won't change those
 	std::array<unsigned int, 3> gen_64bit_constants = {7, 13, 37};

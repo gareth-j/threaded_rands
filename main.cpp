@@ -4,18 +4,18 @@ int main()
 {
 	// Select the generator
 	// Available generators are the xoro128, pcg and jsf PRNGs
-	const generator_type selection = generator_type::jsf;
+	const generator_type selection = generator_type::pcg;
 
 	// How many random numbers to generate
 	const size_t n_rands = 1e8; // or 100'000'000
 
 	// How many threads to use
-	const unsigned int n_threads = 8;
+	const unsigned int n_threads = 2;
 
 	// The type we want returned
 	// Currently only integer types
-	using rand_type = std::uint64_t;
-	using state_type = std::uint64_t;
+	using rand_type = std::uint32_t;
+	using state_type = std::uint32_t;
 	
 	// Lets make some big-ish vectors	
 	std::vector<std::vector<rand_type>> vector_storage;

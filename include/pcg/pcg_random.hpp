@@ -340,7 +340,7 @@ protected:
  * (reducing register pressure).
  *
  * Given the high level of parameterization, the code has to use some
- * template-metaprogramming tricks to handle some of the subtle variations
+ * template-metaprogramming tricks to handle some of the suble variations
  * involved.
  */
 
@@ -403,15 +403,6 @@ protected:
 
 public:
     result_type operator()()
-    {
-        if (output_previous)
-            return this->output(base_generate0());
-        else
-            return this->output(base_generate());
-    }
-
-    // ************ Accessor function for all rand types
-    result_type get_rand()
     {
         if (output_previous)
             return this->output(base_generate0());

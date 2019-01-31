@@ -1,0 +1,8 @@
+TODO
+
+In the benchmark version he gives the number of cycles per byte instead of the number
+of cycles per operation.
+
+
+- Add in the fill_array function that can be passed any type of get_rand style function for filling an array
+

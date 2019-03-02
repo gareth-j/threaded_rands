@@ -10,14 +10,18 @@
 #include <variant>
 #include <omp.h>
 
+#include "system_seeder.hpp"
 #include "generators.hpp"
 
-enum class generator_type{xoro128, pcg, jsf};
+enum class generator_type{pcg32, pcg64, lehmher64, splitmix64};
 
 template<typename result_type, typename state_type>
 class Threaded_rands
 {
-protected:
+private:
+	static_assert((std::is_integral<result_type>::value or std::is_integral<state_type>::value),
+				  "Types must be integral type.");
+
 	// Gets hardware thread information - can be used to limit
 	// the number of threads requested to the number available in hardware
 	unsigned int get_thread_info(const int nt);
@@ -26,8 +30,7 @@ protected:
 	// Number of threads to be used
 	unsigned int n_threads = 1;	
 
-	// using gen_type = std::variant<pcg64_wrap, pcg32_wrap, xoroshiro128, jsf64_wrap>;
-	using gen_type = std::variant<pcg_unique<state_type>, xoroshiro128<state_type>, jsf<state_type>>;
+	using gen_type = std::variant<pcg32, pcg64, lehmher64, splitmix64>;
 
 	// Store the PRNG object created for each thread
 	std::vector<gen_type> gen_vec;
@@ -43,8 +46,6 @@ protected:
 	const unsigned int right_shift = ((RTYPE_BITS == 64) ? 11 : 9);
 	const unsigned int left_shift = ((RTYPE_BITS == 64) ? 53 : 23);
 
-	// TODO - Properly check to see if 16-bit types are requested 
-
 	// Pick the type of int we want to use for getting bounded rands
 	// This needs a better name
 	using int_type = typename std::conditional<8*sizeof(state_type) == 64, __uint128_t, uint64_t>::type;
@@ -55,9 +56,9 @@ public:
     constexpr result_type max() { return ~result_type(0); }
 
    // Default ctor, using the PCG64 PRNG and a single thread
-    Threaded_rands()
+    Threaded_rands() 
     {  	   	
-   	 	gen_vec.push_back(pcg_unique<state_type>(0));	
+   	 	gen_vec.emplace_back(pcg64);	
     }
 
 	// Handle a number of threads and an optional generator selection argument
@@ -68,7 +69,7 @@ public:
 
 		for(unsigned int thread_id = 0; thread_id < n; ++thread_id)
 	    {
-	        if(sel == generator_type::pcg)
+	        if(sel == generator_type::pcg sort me)
 	        	gen_vec.push_back(pcg_unique<state_type>(thread_id));
 			if(sel == generator_type::xoro128)
 	        	gen_vec.push_back(xoroshiro128<state_type>(thread_id));
@@ -79,7 +80,7 @@ public:
 	}
 
 	// Visitor lambda for accessing the vector of variants
-		static constexpr auto gen_visit = [](auto& g){return g.get_rand();};
+	static constexpr auto gen_visit = [](auto& g){return g.get_rand();};
 
 	result_type get_rand(const unsigned int thread_id = 0)
 	{

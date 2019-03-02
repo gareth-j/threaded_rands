@@ -7,8 +7,6 @@
 
 int main()
 {
-	// pcg64wrap gen;
-
 	benchmark bench;
 
 	bench.benchmark_generators();

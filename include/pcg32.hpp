@@ -36,34 +36,50 @@
 // This version doesn't use the key class
 class pcg32
 {
+private:
+	// RNG state.  All values are possible.
+    uint64_t state;
+    // Controls which RNG sequence (stream) is selected. Must *always* be odd.
+    uint64_t inc;
+
+    // Constants - taken from O'Neil's C version of PCG
+    const uint64_t PCG_DEFAULT_MULTIPLIER_64 = 6364136223846793005ULL;
+    const uint64_t PCG_DEFAULT_INCREMENT_64 = 1442695040888963407ULL;
+  
 public:
-    // Initialize the pseudorandom number generator with a non-deterministic
-    // seeds from randutils
+    // Seed the generator with system generated random numbers
     pcg32()
     {
     	std::array<uint32_t, 4> seed_array;
 	    system_seed seeder;		
 		seeder.generate(seed_array.begin(), seed_array.end());
 
-		uint32_t seed_part1 = seed_array[0];
-		uint32_t seed_part2 = seed_array[1];
-		uint32_t seed_part3 = seed_array[2];
-		uint32_t seed_part4 = seed_array[3];
-
 		// Create some 64-bit numbers
-		uint64_t seed1 = (static_cast<uint64_t>(seed_part1) << 32) | seed_part2;
-		uint64_t seed2 = (static_cast<uint64_t>(seed_part3) << 32) | seed_part4;
+		uint64_t seed = (static_cast<uint64_t>(seed_array[0]) << 32) | seed_array[1];
+		uint64_t initseq = (static_cast<uint64_t>(seed_array[2]) << 32) | seed_array[3];
 
 		// The same seeding process used in the O'Neill's C code
-		// This ensures inc is odd
+		// and ensures inc is odd
 		state = 0U;
-		inc = (seed2 << 1u) | 1u;
+		inc = (initseq << 1u) | 1u;
 		get_rand();
-		state += seed1;
+		state += seed;
+		get_rand();
+    }
+
+    pcg32(const uint32_t seed1, const uint32_t seed2)
+    {
+    	uint64_t seed = uint64_t(seed1) << 32 | seed2;
+    	uint64_t initseq = PCG_DEFAULT_INCREMENT_64;
+
+    	state = 0U;
+		inc = (initseq << 1u) | 1u;
+		get_rand();
+		state += seed;
 		get_rand();
     }
     
-    void populate_array_pcg32(uint32_t* rand_arr, const size_t size)
+    void populate_array(uint32_t* rand_arr, const size_t size)
     {
         for(uint32_t i = 0; i < size; ++i)
         {
@@ -71,154 +87,20 @@ public:
         }
     }
 
+    uint32_t operator()()
+    {
+    	return get_rand();
+    }
+
     // Generate a uniformly distributed unsigned 32-bit random number
     uint32_t get_rand() 
     {
         uint64_t oldstate = state;
-
-        state = oldstate * PCG32_MULT + inc;
-
-        uint32_t xorshifted = (uint32_t) (((oldstate >> 18u) ^ oldstate) >> 27u);
-
-        uint32_t rot = (uint32_t) (oldstate >> 59u);
-
+        state = oldstate * PCG_DEFAULT_MULTIPLIER_64 + inc;
+        uint32_t xorshifted = ((oldstate >> 18u) ^ oldstate) >> 27u;
+        uint32_t rot = oldstate >> 59u;
         return (xorshifted >> rot) | (xorshifted << ((~rot + 1u) & 31));
     }
-
-    /// Generate a uniformly distributed number, r, where 0 <= r < bound
-    uint32_t get_bounded_rand(uint32_t bound) 
-    {
-    	// See Notes 1.0
-        uint32_t threshold = (~bound+1u) % bound;
-
-        // Uniformity should guarantee this terminates, usually quickly.
-        // See Notes 1.1
-        for (;;) 
-        {
-            uint32_t r = get_rand();
-            if (r >= threshold)
-                return r % bound;
-        }
-    }
-
-	// Generate a single precision floating point value on the interval [0, 1)
-    float get_float() 
-    {
-		// Trick from MTGP: generate an uniformly distributed
-		// single precision number in [1,2) and subtract 1.
-        union 
-        {
-            uint32_t u;
-            float f;
-        } x;
-
-        x.u = (get_rand() >> 9) | 0x3f800000u;
-        return x.f - 1.0f;
-    }
-
-    // Only 32 bits of the mantissa will be filled for this double
-    // Still greater precision than using float which uses 23 bits
-    // Interval [0, 1)
-    double get_double() 
-    {
-        // Trick from MTGP: generate an uniformly distributed
-        //  double precision number in [1,2) and subtract 1. 
-    	// where MTGP - Mersenne Twister Graphic Processing
-        union 
-        {
-            uint64_t u;
-            double d;
-        } x;
-
-        x.u = ((uint64_t) get_rand() << 20) | 0x3ff0000000000000ULL;
-        return x.d - 1.0;
-    }
-
-    
-    // Multi-step advance function (jump-ahead, jump-back)
-    // See Notes 1.2
-    void advance(int64_t delta_) 
-    {
-        uint64_t
-            cur_mult = PCG32_MULT,
-            cur_plus = inc,
-            acc_mult = 1u,
-            acc_plus = 0u;
-
-		// Even though delta is an unsigned integer, we can pass a signed
-		// integer to go backwards, it just goes "the long way round".
-        uint64_t delta = (uint64_t) delta_;
-
-        while (delta > 0) 
-        {
-        	// What's the least sig. bit of delta?
-            if (delta & 1) 
-            {
-                acc_mult *= cur_mult;
-                acc_plus = acc_plus * cur_mult + cur_plus;
-            }
-            cur_plus = (cur_mult + 1) * cur_plus;
-            cur_mult *= cur_mult;
-            delta /= 2;
-        }
-
-        state = acc_mult * state + acc_plus;
-    }
-
-
-	// Draw uniformly distributed permutation and permute the
-	// given STL container
-	// From: Knuth, TAoCP Vol. 2 (3rd 3d), Section 3.4.2     
-    template <typename Iterator> 
-    void shuffle(Iterator begin, Iterator end) 
-    {
-        for (Iterator it = end - 1; it > begin; --it)
-            std::iter_swap(it, begin + get_bounded_rand((uint32_t) (it - begin + 1)));
-    }
-
-    /// Compute the distance between two PCG32 pseudorandom number generators
-    int64_t operator-(const pcg32 &other) const 
-    {
-        assert(inc == other.inc);
-
-        uint64_t
-            cur_mult = PCG32_MULT,
-            cur_plus = inc,
-            cur_state = other.state,
-            the_bit = 1u,
-            distance = 0u;
-
-        while (state != cur_state) 
-        {
-            if ((state & the_bit) != (cur_state & the_bit)) 
-            {
-                cur_state = cur_state * cur_mult + cur_plus;
-                distance |= the_bit;
-            }
-
-            assert((state & the_bit) == (cur_state & the_bit));
-            the_bit <<= 1;
-            cur_plus = (cur_mult + 1ULL) * cur_plus;
-            cur_mult *= cur_mult;
-        }
-
-        return (int64_t) distance;
-    }
-
-   	// Equality operator
-    bool operator==(const pcg32 &other) const { return state == other.state && inc == other.inc; }
-
-    // Inequality operator
-    bool operator!=(const pcg32 &other) const { return state != other.state || inc != other.inc; }
-
-    // RNG state.  All values are possible.
-    uint64_t state;
-    // Controls which RNG sequence (stream) is selected. Must *always* be odd.
-    uint64_t inc;
-
-    // Multiplication constant
-    const unsigned long long PCG32_MULT = 0x5851f42d4c957f2d;
-
 };
 
 #endif // 	PCG32_H

@@ -2,18 +2,28 @@
 #define THREADEDRANDS_HPP
 
 #include <iostream>
-#include <vector>
-#include <random>
-#include <memory>
-#include <type_traits>
 #include <cstdlib>
+#include <chrono>
+#include <memory>
+#include <random>
+#include <vector>
+#include <type_traits>
 #include <variant>
+#include <thread>
+
 #include <omp.h>
 
 #include "system_seeder.hpp"
-#include "generators.hpp"
+#include "generators/pcg32.hpp"
+#include "generators/pcg64.hpp"
+#include "generators/lehmer64.hpp"
+#include "generators/splitmix64.hpp"
 
-enum class generator_type{pcg32, pcg64, lehmher64, splitmix64};
+ #include <unistd.h>
+
+// #include "generators.hpp"
+
+enum class generator_type{pcg32, pcg64, lehmer64, splitmix64};
 
 template<typename result_type, typename state_type>
 class Threaded_rands
@@ -30,7 +40,7 @@ private:
 	// Number of threads to be used
 	unsigned int n_threads = 1;	
 
-	using gen_type = std::variant<pcg32, pcg64, lehmher64, splitmix64>;
+	using gen_type = std::variant<pcg32, pcg64, lehmer64, splitmix64>;
 
 	// Store the PRNG object created for each thread
 	std::vector<gen_type> gen_vec;
@@ -58,25 +68,26 @@ public:
    // Default ctor, using the PCG64 PRNG and a single thread
     Threaded_rands() 
     {  	   	
-   	 	gen_vec.emplace_back(pcg64);	
+   	 	gen_vec.emplace_back(pcg64());
     }
 
 	// Handle a number of threads and an optional generator selection argument
-	Threaded_rands(const unsigned int n, const generator_type sel = generator_type::pcg) : n_threads{n}
+	Threaded_rands(const unsigned int n, const generator_type sel = generator_type::pcg64) : n_threads{n}
 	{					
 		// TODO - Implement thread number checking properly
 		// n_threads = get_thread_info(_n_threads);
 
 		for(unsigned int thread_id = 0; thread_id < n; ++thread_id)
 	    {
-	        if(sel == generator_type::pcg sort me)
-	        	gen_vec.push_back(pcg_unique<state_type>(thread_id));
-			if(sel == generator_type::xoro128)
-	        	gen_vec.push_back(xoroshiro128<state_type>(thread_id));
-	        if(sel == generator_type::jsf)
-	        	gen_vec.push_back(jsf<state_type>(thread_id));
+				if(sel == generator_type::pcg32)
+					gen_vec.push_back(pcg32());
+				if(sel == generator_type::pcg64)
+					gen_vec.push_back(pcg64());
+				if(sel == generator_type::lehmer64)
+					gen_vec.push_back(lehmer64());
+				if(sel == generator_type::splitmix64)
+					gen_vec.push_back(splitmix64());
 	    }
-
 	}
 
 	// Visitor lambda for accessing the vector of variants
@@ -114,10 +125,22 @@ public:
 	// This function currently just returns a double in the range [0:1)
 	// This method below result in a difference of ~ 1e-8 from dividing by UINT64_MAX	
 	// TODO - Check if this introduces a bias in the generated numbers.
-	inline double double_conv(const result_type v) {return ((state_type)(v >> right_shift)) / (double)(1L << left_shift);}
+	// inline double double_conv(const result_type v) {return ((state_type)(v >> right_shift)) / (double)(1L << left_shift);}
 
-	// Alternative - but slower in my measurements - versions that may be more precise / not have rounding errors ?
-	// inline double double_conv(const result_type v) { return v/double(max());}
+	// Trick from MTGP: generate an uniformly distributed
+	// double precision number in [1,2) and subtract 1. 
+	// where MTGP - Mersenne Twister Graphic Processing
+	inline double double_conv(uint64_t rand) 
+    {
+        union 
+        {
+            uint64_t u;
+            double d;
+        } x;
+
+        x.u = ((uint64_t) rand << 20) | 0x3ff0000000000000ULL;
+        return x.d - 1.0;
+    }
 
 	// TODO - add in functions for a better range of doubles  
 

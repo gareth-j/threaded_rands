@@ -4,7 +4,7 @@ int main()
 {
 	// Select the generator
 	// Available generators are the xoro128, pcg and jsf PRNGs
-	const generator_type selection = generator_type::xoro128;
+	const generator_type selection = generator_type::pcg64;
 
 	// How many random numbers to generate
 	const size_t n_rands = 1e8; // or 100'000'000
@@ -15,7 +15,6 @@ int main()
 	// The type we want returned
 	// Currently only integer types
 	using rand_type = std::uint64_t;
-	using state_type = std::uint64_t;
 	
 	// Lets make some big-ish vectors	
 	std::vector<std::vector<rand_type>> vector_storage;
@@ -23,7 +22,7 @@ int main()
 		vector_storage.emplace_back(std::vector<rand_type>(n_rands));
 
 	// Create the PRNG 
-	Threaded_rands<rand_type, state_type> my_generator(n_threads, selection);
+	Threaded_rands<rand_type> my_generator(n_threads, selection);
 
 	// Use a high resolution clock from the standard library for timing
 	using hr_clock = std::chrono::high_resolution_clock;

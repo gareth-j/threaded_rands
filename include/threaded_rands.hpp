@@ -25,12 +25,11 @@
 
 enum class generator_type{pcg32, pcg64, lehmer64, splitmix64};
 
-template<typename result_type, typename state_type>
+template<typename result_type, typename state_type=result_type>
 class Threaded_rands
 {
 private:
-	static_assert((std::is_integral<result_type>::value or std::is_integral<state_type>::value),
-				  "Types must be integral type.");
+	static_assert((std::is_integral<result_type>::value), "Result type must be integral.");
 
 	// Gets hardware thread information - can be used to limit
 	// the number of threads requested to the number available in hardware
@@ -53,8 +52,9 @@ private:
 	const int bit_shift = std::max(0, STYPE_BITS - RTYPE_BITS);
 
 	// For int to double conversion using the quick method
-	const unsigned int right_shift = ((RTYPE_BITS == 64) ? 11 : 9);
-	const unsigned int left_shift = ((RTYPE_BITS == 64) ? 53 : 23);
+	// Unused when using MTGP method
+	// const unsigned int right_shift = ((RTYPE_BITS == 64) ? 11 : 9);
+	// const unsigned int left_shift = ((RTYPE_BITS == 64) ? 53 : 23);
 
 	// Pick the type of int we want to use for getting bounded rands
 	// This needs a better name

@@ -21,27 +21,30 @@ private:
 	// This is currently unused as we set the increment during seeding
 	const pcg128_t PCG_DEFAULT_INCREMENT_128 = (static_cast<pcg128_t>(6364136223846793005ULL) << 64) + 1442695040888963407ULL;
 
-	inline void pcg_setseq_128_step_r()
-	{
-		state = state * PCG_DEFAULT_MULTIPLIER_128 + inc;
-	}
+	// inline void pcg_setseq_128_step_r()
+	// {
+	// 	state = state * PCG_DEFAULT_MULTIPLIER_128 + inc;
+	// }
 
-	// verbatim from O'Neill's except that we skip her assembly:
-	inline uint64_t pcg_rotr_64(uint64_t value, unsigned int rot) 
-	{
-		return (value >> rot) | (value << ((-rot) & 63));
-	}
+	// // verbatim from O'Neill's except that we skip her assembly:
+	// inline uint64_t pcg_rotr_64(uint64_t value, unsigned int rot) 
+	// {
+	// 	return (value >> rot) | (value << ((-rot) & 63));
+	// }
 
-	inline uint64_t pcg_output_xsl_rr_128_64() 
-	{
-		return pcg_rotr_64(((uint64_t)(state >> 64u)) ^ (uint64_t)state, state >> 122u);
-	}
+	// inline uint64_t pcg_output_xsl_rr_128_64() 
+	// {
+	// 	return pcg_rotr_64(((uint64_t)(state >> 64u)) ^ (uint64_t)state, state >> 122u);
+	// }
 
 	// This is the get_rand function really
 	inline uint64_t pcg_setseq_128_xsl_rr_64_random_r() 
 	{
-		pcg_setseq_128_step_r();
-		return pcg_output_xsl_rr_128_64();
+		state = state * PCG_DEFAULT_MULTIPLIER_128 + inc;
+		uint64_t value = (uint64_t)(state >> 64u) ^ (uint64_t)state;
+		uint64_t rot = state >> 122u;
+
+		return (value >> rot) | (value << ((-rot) & 63));
 	}
 
 public:

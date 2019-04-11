@@ -22,7 +22,8 @@ int main()
 		vector_storage.emplace_back(std::vector<rand_type>(n_rands));
 
 	// Create the PRNG 
-	Threaded_rands<rand_type> my_generator(n_threads, selection);
+	// Threaded_rands<rand_type> my_generator(n_threads, selection);
+	Threaded_rands<rand_type> my_generator;
 
 	// Use a high resolution clock from the standard library for timing
 	using hr_clock = std::chrono::high_resolution_clock;

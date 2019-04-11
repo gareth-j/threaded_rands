@@ -14,7 +14,7 @@
 #include <omp.h>
 
 #include "system_seeder.hpp"
-#include "generators/pcg32.hpp"
+// #include "generators/pcg32.hpp"
 #include "generators/pcg64.hpp"
 #include "generators/lehmer64.hpp"
 #include "generators/splitmix64.hpp"
@@ -39,7 +39,8 @@ private:
 	// Number of threads to be used
 	unsigned int n_threads = 1;	
 
-	using gen_type = std::variant<pcg32, pcg64, lehmer64, splitmix64>;
+	// using gen_type = std::variant<pcg32, pcg64, lehmer64, splitmix64>;
+	using gen_type = std::variant<pcg64, lehmer64, splitmix64>;
 
 	// Store the PRNG object created for each thread
 	std::vector<gen_type> gen_vec;
@@ -53,8 +54,8 @@ private:
 
 	// For int to double conversion using the quick method
 	// Unused when using MTGP method
-	// const unsigned int right_shift = ((RTYPE_BITS == 64) ? 11 : 9);
-	// const unsigned int left_shift = ((RTYPE_BITS == 64) ? 53 : 23);
+	const unsigned int right_shift = ((RTYPE_BITS == 64) ? 11 : 9);
+	const unsigned int left_shift = ((RTYPE_BITS == 64) ? 53 : 23);
 
 	// Pick the type of int we want to use for getting bounded rands
 	// This needs a better name
@@ -79,8 +80,8 @@ public:
 
 		for(unsigned int thread_id = 0; thread_id < n; ++thread_id)
 	    {
-				if(sel == generator_type::pcg32)
-					gen_vec.push_back(pcg32());
+				// if(sel == generator_type::pcg32)
+				// 	gen_vec.push_back(pcg32());
 				if(sel == generator_type::pcg64)
 					gen_vec.push_back(pcg64());
 				if(sel == generator_type::lehmer64)
@@ -125,22 +126,22 @@ public:
 	// This function currently just returns a double in the range [0:1)
 	// This method below result in a difference of ~ 1e-8 from dividing by UINT64_MAX	
 	// TODO - Check if this introduces a bias in the generated numbers.
-	// inline double double_conv(const result_type v) {return ((state_type)(v >> right_shift)) / (double)(1L << left_shift);}
+	inline double double_conv(const result_type v) {return ((state_type)(v >> right_shift)) / (double)(1L << left_shift);}
 
 	// Trick from MTGP: generate an uniformly distributed
 	// double precision number in [1,2) and subtract 1. 
 	// where MTGP - Mersenne Twister Graphic Processing
-	inline double double_conv(uint64_t rand) 
-    {
-        union 
-        {
-            uint64_t u;
-            double d;
-        } x;
+	// inline double double_conv(uint64_t rand) 
+ //    {
+ //        union 
+ //        {
+ //            uint64_t u;
+ //            double d;
+ //        } x;
 
-        x.u = ((uint64_t) rand << 20) | 0x3ff0000000000000ULL;
-        return x.d - 1.0;
-    }
+ //        x.u = ((uint64_t) rand << 20) | 0x3ff0000000000000ULL;
+ //        return x.d - 1.0;
+ //    }
 
 	// TODO - add in functions for a better range of doubles  
 
